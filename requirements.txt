@@ -1,3 +1,2 @@
 vk_api
-discord.py
 pyyaml
