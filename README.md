@@ -16,14 +16,14 @@ python3 __main__.py
 ### Linux
 
 ```bash
-python3 -m pip install -r requirements.txt
+python3.8 -m pip install -r requirements.txt
 export VK_GROUP_ID=
   # ID группы бота вк
 export VK_TOKEN=
   # Токен бота вк
 export DISCORD_TOKEN=
   # Токен бота дискорда
-python3 __main__.py
+python3.8 __main__.py
 ```
 
 Во время запуска нужно ввести:
