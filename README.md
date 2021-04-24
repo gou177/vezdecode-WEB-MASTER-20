@@ -5,6 +5,7 @@
 
 ```bash
 python3 -m pip install -r requirements.txt
+python3 -m pip install discord.py
 set VK_GROUP_ID=
   # ID группы бота вк
 set VK_TOKEN=
@@ -17,6 +18,7 @@ python3 __main__.py
 
 ```bash
 python3 -m pip install -r requirements.txt
+python3 -m pip install discord.py
 export VK_GROUP_ID=
   # ID группы бота вк
 export VK_TOKEN=
