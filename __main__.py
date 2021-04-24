@@ -4,7 +4,12 @@ from discord.message import Attachment, Message
 from os import getenv, remove
 import yaml
 import vk_api
-from vk_api.bot_longpoll import VkBotLongPoll, VkBotEventType, VkBotMessageEvent
+from vk_api.bot_longpoll import (
+    VkBotLongPoll,
+    VkBotEventType,
+    VkBotMessageEvent,
+    DotDict,
+)
 import threading
 import asyncio
 from vk_api.utils import get_random_id
@@ -136,6 +141,68 @@ async def send(rule: dict, text: str, attach: Optional[str]):
             remove(attach)
 
 
+def format_vk_msg(message: VkBotMessageEvent):
+    user = vk.users.get(user_ids=message.from_id)[0]  # type: ignore
+    attach = ""
+    attachments = message.attachments  # type: ignore
+    if attachments:
+        for attachment in attachments:
+            if attachment["type"] == "photo":
+                attach += "[Фото] "
+                attach += max(
+                    attachment["photo"]["sizes"],
+                    key=lambda x: (x["width"], x["height"]),
+                )["url"]
+                attach += "\n"
+            if attachment["type"] == "doc":
+                attach += "[Документ] "
+                attach += attachment['doc']['url']
+                attach += "\n"
+            if attachment["type"] == "audio":
+                attach += "[Аудио] "
+                attach += f'{attachment["audio"]["artist"]} - {attachment["audio"]["title"]}'
+                attach += "\n"
+            if attachment["type"] == "sticker":
+                attach += "[Стикер] "
+                attach += max(
+                    attachment["sticker"]["images"],
+                    key=lambda x: (x["width"], x["height"]),
+                )["url"]
+                attach += "\n"
+            if attachment["type"] == "video":
+                attach += f"[Видео] {attachment['video']['title']} "
+                attach += fr"https://vk.com/video?z=video{attachment['video']['owner_id']}_{attachment['video']['id']}_{attachment['video']['access_key']}"
+                attach += "\n"
+            if attachment["type"] == "poll":
+                attach += "[Опрос] "
+                attach += attachment["poll"]["question"]
+                attach += "\n"
+                for answer in attachment["poll"]["answers"]:
+                    attach += f"{answer['text']} [{'█'*(int(answer['rate']//5)):░<20}] - {answer['votes']}\n"
+                attach += "\n"
+    fwd = ""
+    if message.fwd_messages:  # type: ignore
+        fwd += "\n[Пересланное сообщение]"
+        fwd += "\n".join(
+            map(
+                lambda x: f"  {x}",
+                "\n".join(
+                    map(format_vk_msg, map(DotDict, message.fwd_messages)),  # type: ignore
+                ).split("\n"),
+            )
+        )  # type: ignore
+    if message.reply_message:  # type: ignore
+        fwd += "\n[Ответ]"
+        fwd += "\n".join(
+            map(
+                lambda x: f"  {x}",
+                format_vk_msg(DotDict(message.reply_message)).split("\n"),  # type: ignore
+            )
+        )
+
+    return f'{user["first_name"]} {user["last_name"]}:\n{message.text}{fwd}\n{attach}'  # type: ignore
+
+
 @retry
 def vk_listener():
     longpoll = VkBotLongPoll(vk_session, int(getenv("VK_GROUP_ID", "")))
@@ -146,22 +213,12 @@ def vk_listener():
         if type(event) is VkBotMessageEvent:
             if event.message.from_id < 0:  # type: ignore
                 continue
-            user = vk.users.get(user_ids=event.message.from_id)[0]  # type: ignore
             for rule in select("vk", event.message.peer_id):  # type: ignore
-                attach = ""
-                attachments = event.message.attachments
-                if attachments:
-                    for attachment in attachments:
-                        if attachment["type"] != "photo":
-                            continue
-                        attach = max(
-                            attachment["photo"]["sizes"],
-                            key=lambda x: (x["width"], x["height"]),
-                        )["url"]
+                text = format_vk_msg(event.message)
                 loop.create_task(
                     send(
                         rule,
-                        f'{user["first_name"]} {user["last_name"]}:\n{event.message.text}\n{attach}',  # type: ignore
+                        text,
                         None,
                     )
                 )
